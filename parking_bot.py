@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from json import dump, load
+from logging import INFO, basicConfig, getLogger
 
 from emoji import emojize
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -129,7 +130,7 @@ def update_state(update: Update, context: CallbackContext, info: str,
                 markup = make_keyboard(context, user)
                 view.update(info, parking.state_text, markup)
     except BadRequest:
-        # If user delete original message - just send new and save new view
+        # If user delete original message - just send new and save the new view
         info = update.effective_message.reply_text('---')
         status = update.effective_message.reply_text(
             parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
@@ -191,6 +192,10 @@ def manage_user(update: Update, context: CallbackContext, check=True) -> None:
         save_json(config['users_file'], users)
 
 
+def log_event(update: Update, action: str) -> None:
+    logger.log(INFO, f'{users[str(update.effective_user.id)]} - {action}')
+
+
 def load_json(filename) -> object:
     try:
         with open(filename) as file:
@@ -218,8 +223,9 @@ def get_config() -> dict:
 config = get_config()
 users = load_json(config['users_file'])
 
-datafile = PicklePersistence(filename=config['data_file'],
-                             store_chat_data=False, on_flush=False)
+log_format = '%(asctime)s %(levelname)s %(name)s %(message)s'
+basicConfig(filename=config['log_file'], format=log_format, level=INFO)
+logger = getLogger(__name__)
 
 handlers = [CommandHandler('start', start),
             CommandHandler('stop', stop),
@@ -230,7 +236,8 @@ handlers = [CommandHandler('start', start),
 
 
 def main():
-    updater = Updater(token=config['token'], persistence=datafile)
+    updater = Updater(token=config['token'], persistence=PicklePersistence(
+        filename=config['data_file'], store_chat_data=False, on_flush=False))
     dispatcher = updater.dispatcher
     dispatcher.bot_data['stats'] = dispatcher.bot_data.get('stats',
                                                            Stats(users))
