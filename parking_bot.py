@@ -24,17 +24,20 @@ def start(update: Update, context: CallbackContext) -> None:
             parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
         view = UserView(info, status)
         context.bot_data['views'][str(update.effective_user.id)] = view
+        log_event(update, 'Отправил start')
 
 
 def stop(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         try:
+            # FIXME
+            log_event(update, 'Отправил stop')
             view = context.bot_data['views'][str(update.effective_user.id)]
             view.delete()
             manage_user(update, context, False)
         except KeyError:
-            pass
+            log_event(update, 'Отправил stop повторно')
 
 
 def parking_handler(update: Update, context: CallbackContext) -> None:
@@ -58,12 +61,13 @@ def parking_handler(update: Update, context: CallbackContext) -> None:
             elif state == 'free':
                 action_text = 'освободил'
             update.callback_query.answer(f'Вы {action_text}и место {number}')
-            action = ' '.join([
-                '*' + users[str(update.effective_user.id)] + '*', action_text,
-                'место', '*' + number + '*'])
+            action = (f'*{users[str(update.effective_user.id)]}* ' +
+                      f'{action_text} место *{number}*')
             update_state(update, context, action)
+            log_event(update, action)
         except ValueError:
             update.callback_query.answer(f'Место {number} не свободно!')
+            log_event(update, f'Нажал на несвободное место {number}')
 
 
 def cancel_handler(update: Update, context: CallbackContext) -> None:
@@ -72,17 +76,14 @@ def cancel_handler(update: Update, context: CallbackContext) -> None:
         context.user_data['is_in_menu'] = False
         number = update.callback_query.data.split('.')[1]
         parking = context.bot_data['parking']
-        try:
-            for place in parking.places:
-                if place.number == number:
-                    place.cancel_reserve()
-            update.callback_query.answer(f'Вы отменили резерв места {number}')
-            action = ' '.join([
-                '*' + users[str(update.effective_user.id)] + '*',
-                'отменил резерв места', '*' + number + '*'])
-            update_state(update, context, action)
-        except ValueError:
-            update.callback_query.answer(f'Место {number} не ваше!')
+        for place in parking.places:
+            if place.number == number:
+                place.cancel_reserve()
+        update.callback_query.answer(f'Вы отменили резерв места {number}')
+        action = (f'*{users[str(update.effective_user.id)]}* ' +
+                  f'отменил резерв места *{number}*')
+        update_state(update, context, action)
+        log_event(update, action)
 
 
 def clear_handler(update: Update, context: CallbackContext) -> None:
@@ -96,9 +97,10 @@ def clear_handler(update: Update, context: CallbackContext) -> None:
             stats = context.bot_data['stats']
             for place in places:
                 stats.count(place)
-        action = ' '.join(['*' + users[str(update.effective_user.id)] + '*',
-                           'очистил парковочное пространство'])
+        action = (f'*{users[str(update.effective_user.id)]}* ' +
+                  'очистил парковочное пространство')
         update_state(update, context, action)
+        log_event(update, action)
 
 
 def statistics_handler(update: Update, context: CallbackContext) -> None:
@@ -111,10 +113,12 @@ def statistics_handler(update: Update, context: CallbackContext) -> None:
             context.user_data['is_in_menu'] = True
             stats = context.bot_data['stats']
             update_state(update, context, stats.message_text, True)
+            log_event(update, 'Открыл статистику')
         else:
             update.callback_query.answer('Вы закрыли статистику')
             context.user_data['is_in_menu'] = False
             update_state(update, context, r'\-\-\-', True)
+            log_event(update, 'Закрыл статистику')
 
 
 def update_state(update: Update, context: CallbackContext, info: str,
@@ -129,6 +133,7 @@ def update_state(update: Update, context: CallbackContext, info: str,
                 view = context.bot_data['views'][user]
                 markup = make_keyboard(context, user)
                 view.update(info, parking.state_text, markup)
+                log_event(update, f'Отправили уведомление {users[user]}')
     except BadRequest:
         # If user delete original message - just send new and save the new view
         info = update.effective_message.reply_text('---')
@@ -136,6 +141,7 @@ def update_state(update: Update, context: CallbackContext, info: str,
             parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
         view = UserView(info, status)
         context.bot_data['views'][str(update.effective_user.id)] = view
+        log_event(update, 'Что-то сделал с сообщениями бота')
 
 
 def make_keyboard(context: CallbackContext,
@@ -193,6 +199,7 @@ def manage_user(update: Update, context: CallbackContext, check=True) -> None:
 
 
 def log_event(update: Update, action: str) -> None:
+    action = action.replace('*', '')
     logger.log(INFO, f'{users[str(update.effective_user.id)]} - {action}')
 
 
