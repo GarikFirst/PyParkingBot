@@ -3,28 +3,29 @@ from json import dump, load
 
 from emoji import emojize
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.error import BadRequest
 from telegram.ext import (CallbackContext, CallbackQueryHandler,
-                          CommandHandler, Updater)
+                          CommandHandler, PicklePersistence, Updater)
 
 from structures.parking import Parking as Parking
 from structures.stats import Stats as Stats
 from structures.user_view import UserView as UserView
 
 
-def start(update: Update, context: CallbackContext):
+def start(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
-        markup = make_keyboard(str(update.effective_user.id))
+        parking = context.bot_data['parking']
+        markup = make_keyboard(context, str(update.effective_user.id))
         info = update.effective_message.reply_text('---')
         status = update.effective_message.reply_text(
             parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
         view = UserView(info, status)
-        context.bot_data['views'] = context.bot_data.get('views', {})
         context.bot_data['views'][str(update.effective_user.id)] = view
 
 
-def stop(update: Update, context: CallbackContext):
+def stop(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         try:
@@ -35,13 +36,15 @@ def stop(update: Update, context: CallbackContext):
             pass
 
 
-def parking_handler(update: Update, context: CallbackContext):
+def parking_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         update.callback_query.edit_message_text('test')
         context.user_data['is_in_menu'] = False
         number = update.callback_query.data
+        parking = context.bot_data['parking']
         try:
+            stats = context.bot_data['stats']
             for place in parking.places:
                 if place.number == number:
                     stats.count(place)
@@ -62,11 +65,12 @@ def parking_handler(update: Update, context: CallbackContext):
             update.callback_query.answer(f'Место {number} не свободно!')
 
 
-def cancel_handler(update: Update, context: CallbackContext):
+def cancel_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         context.user_data['is_in_menu'] = False
         number = update.callback_query.data.split('.')[1]
+        parking = context.bot_data['parking']
         try:
             for place in parking.places:
                 if place.number == number:
@@ -80,13 +84,15 @@ def cancel_handler(update: Update, context: CallbackContext):
             update.callback_query.answer(f'Место {number} не ваше!')
 
 
-def clear_handler(update: Update, context: CallbackContext):
+def clear_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         context.user_data['is_in_menu'] = False
         update.callback_query.answer('Вы выбрали очистку парковки')
+        parking = context.bot_data['parking']
         places = parking.clear()
         if places:
+            stats = context.bot_data['stats']
             for place in places:
                 stats.count(place)
         action = ' '.join(['*' + users[str(update.effective_user.id)] + '*',
@@ -94,7 +100,7 @@ def clear_handler(update: Update, context: CallbackContext):
         update_state(update, context, action)
 
 
-def statistics_handler(update: Update, context: CallbackContext):
+def statistics_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         context.user_data['is_in_menu'] = context.user_data.get('is_in_menu',
@@ -102,6 +108,7 @@ def statistics_handler(update: Update, context: CallbackContext):
         if not context.user_data['is_in_menu']:
             update.callback_query.answer('Вы открыли статистику')
             context.user_data['is_in_menu'] = True
+            stats = context.bot_data['stats']
             update_state(update, context, stats.message_text, True)
         else:
             update.callback_query.answer('Вы закрыли статистику')
@@ -111,18 +118,29 @@ def statistics_handler(update: Update, context: CallbackContext):
 
 def update_state(update: Update, context: CallbackContext, info: str,
                  personal=False) -> None:
-    if personal:
-        view = context.bot_data['views'][str(update.effective_user.id)]
-        view.update(info, None)
-    else:
-        for user in users:
-            view = context.bot_data['views'][user]
-            markup = make_keyboard(user)
-            view.update(info, parking.state_text, markup)
+    try:
+        if personal:
+            view = context.bot_data['views'][str(update.effective_user.id)]
+            view.update(info, None)
+        else:
+            for user in users:
+                parking = context.bot_data['parking']
+                view = context.bot_data['views'][user]
+                markup = make_keyboard(context, user)
+                view.update(info, parking.state_text, markup)
+    except BadRequest:
+        # If user delete original message - just send new and save new view
+        info = update.effective_message.reply_text('---')
+        status = update.effective_message.reply_text(
+            parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
+        view = UserView(info, status)
+        context.bot_data['views'][str(update.effective_user.id)] = view
 
 
-def make_keyboard(user_id: str) -> InlineKeyboardMarkup:
+def make_keyboard(context: CallbackContext,
+                  user_id: str) -> InlineKeyboardMarkup:
     keyboard = []
+    parking = context.bot_data['parking']
     for place in parking.state:
         place_sign, state, number, occupant = place
         if occupant is not None:
@@ -157,7 +175,7 @@ def make_keyboard(user_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def manage_user(update: Update, context: CallbackContext, check=True):
+def manage_user(update: Update, context: CallbackContext, check=True) -> None:
     user_id = str(update.effective_user.id)
     if check:
         if update.effective_user.full_name is None:
@@ -173,7 +191,7 @@ def manage_user(update: Update, context: CallbackContext, check=True):
         save_json(config['users_file'], users)
 
 
-def load_json(filename):
+def load_json(filename) -> object:
     try:
         with open(filename) as file:
             data = load(file)
@@ -182,7 +200,7 @@ def load_json(filename):
         exit(f'File "{filename}" does not exist')
 
 
-def save_json(filename, data):
+def save_json(filename, data) -> None:
     with open(filename, 'w') as file:
         dump(data, file, indent=4, sort_keys=True)
 
@@ -199,8 +217,9 @@ def get_config() -> dict:
 
 config = get_config()
 users = load_json(config['users_file'])
-parking = Parking(config['places'])
-stats = Stats(users)
+
+datafile = PicklePersistence(filename=config['data_file'],
+                             store_chat_data=False, on_flush=False)
 
 handlers = [CommandHandler('start', start),
             CommandHandler('stop', stop),
@@ -211,8 +230,16 @@ handlers = [CommandHandler('start', start),
 
 
 def main():
-    updater = Updater(token=config['token'])
+    updater = Updater(token=config['token'], persistence=datafile)
     dispatcher = updater.dispatcher
+    dispatcher.bot_data['stats'] = dispatcher.bot_data.get('stats',
+                                                           Stats(users))
+    dispatcher.bot_data['views'] = dispatcher.bot_data.get('views', {})
+    dispatcher.bot_data['parking'] = dispatcher.bot_data.get(
+        'parking', Parking(config['places']))
+    if ([x[2] for x in dispatcher.bot_data['parking'].state]
+       != config['places']):
+        dispatcher.bot_data['parking'] = Parking(config['places'])
     for handler in handlers:
         dispatcher.add_handler(handler)
     updater.start_polling(drop_pending_updates=True)
