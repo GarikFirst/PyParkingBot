@@ -9,6 +9,9 @@ from .parking import ParkingPlace
 class Stats:
     """Statistics class for storing and counting.
 
+    We need deepcopy of users, so if users changes,
+    we keep all original ones for captions.
+
     Have multiple dimensions, like weekdays, persons, etc...
     """
     def __init__(self, users: dict) -> None:
