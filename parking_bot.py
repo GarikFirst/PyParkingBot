@@ -43,7 +43,7 @@ def stop(update: Update, context: CallbackContext) -> None:
 def parking_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
-        update.callback_query.edit_message_text('test')
+        manage_user(update, context)
         context.user_data['is_in_menu'] = False
         number = update.callback_query.data
         parking = context.bot_data['parking']
@@ -73,6 +73,7 @@ def parking_handler(update: Update, context: CallbackContext) -> None:
 def cancel_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
+        manage_user(update, context)
         context.user_data['is_in_menu'] = False
         number = update.callback_query.data.split('.')[1]
         parking = context.bot_data['parking']
@@ -89,6 +90,7 @@ def cancel_handler(update: Update, context: CallbackContext) -> None:
 def clear_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
+        manage_user(update, context)
         context.user_data['is_in_menu'] = False
         update.callback_query.answer('Вы выбрали очистку парковки')
         parking = context.bot_data['parking']
@@ -106,6 +108,7 @@ def clear_handler(update: Update, context: CallbackContext) -> None:
 def statistics_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
+        manage_user(update, context)
         context.user_data['is_in_menu'] = context.user_data.get('is_in_menu',
                                                                 False)
         if not context.user_data['is_in_menu']:
@@ -123,25 +126,39 @@ def statistics_handler(update: Update, context: CallbackContext) -> None:
 
 def update_state(update: Update, context: CallbackContext, info: str,
                  personal=False) -> None:
-    try:
-        if personal:
+    """ Personal or bulk messages update """
+    def bad_request(user, text=None) -> None:
+        """ Resend messages if user messed them up """
+        log_event(update, f'{users[user]} что-то сделал с сообщениями бота')
+        markup = make_keyboard(context, user)
+        if text is not None:
+            info = update.effective_message.bot.send_message(
+                user, text, parse_mode='MarkdownV2')
+        else:
+            info = update.effective_message.bot.send_message(user, '---')
+        status = update.effective_message.bot.send_message(
+            user, parking.state_text, reply_markup=markup,
+            parse_mode='MarkdownV2')
+        view = UserView(info, status)
+        context.bot_data['views'][user] = view
+        log_event(update, f'Отправили уведомление {users[user]}')
+
+    parking = context.bot_data['parking']
+    if personal:
+        try:
             view = context.bot_data['views'][str(update.effective_user.id)]
             view.update(info, None)
-        else:
-            for user in users:
-                parking = context.bot_data['parking']
+        except BadRequest:
+            bad_request(str(update.effective_user.id))
+    else:
+        for user in users:
+            try:
                 view = context.bot_data['views'][user]
                 markup = make_keyboard(context, user)
                 view.update(info, parking.state_text, markup)
                 log_event(update, f'Отправили уведомление {users[user]}')
-    except BadRequest:
-        # If user delete original message - just send new and save the new view
-        info = update.effective_message.reply_text('---')
-        status = update.effective_message.reply_text(
-            parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
-        view = UserView(info, status)
-        context.bot_data['views'][str(update.effective_user.id)] = view
-        log_event(update, 'Что-то сделал с сообщениями бота')
+            except BadRequest:
+                bad_request(user, info)
 
 
 def make_keyboard(context: CallbackContext,
@@ -189,10 +206,16 @@ def manage_user(update: Update, context: CallbackContext, check=True) -> None:
             username = update.effective_user.username
         else:
             username = update.effective_user.full_name
+        # Replace for telegram markdown v2
+        for ch in ['_', '*', '[', ']', '(', ')', '~', '`', '>',
+                   '#', '+', '-', '=', '|', '{', '}', '.', '!']:
+            username = username.replace(ch, '')
         if user_id not in users or users[user_id] != username:
             users[user_id] = username
-        save_json(config['users_file'], users)
-        log_event(update, 'Добавили пользователя')
+            save_json(config['users_file'], users)
+            stats = context.bot_data['stats']
+            stats.update_users(users)
+            log_event(update, 'Добавили пользователя')
     elif not check and user_id in users:
         context.bot_data['views'].pop(user_id, None)
         users.pop(user_id, None)
