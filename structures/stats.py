@@ -24,6 +24,7 @@ class Stats:
 
     @property
     def message_text(self):
+        """Contains statistics text for messages"""
         return self.__make_message_text()
 
     def count(self, place: ParkingPlace) -> None:
