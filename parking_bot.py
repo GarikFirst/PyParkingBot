@@ -185,7 +185,7 @@ def update_state(update: Update, context: CallbackContext, info: str,
         try:
             view = context.bot_data['views'][str(update.effective_user.id)]
             view.update(info, None)
-        except BadRequest:
+        except (BadRequest, KeyError):
             # So user needs new messages for updating
             bad_request(str(update.effective_user.id))
     else:
@@ -195,7 +195,7 @@ def update_state(update: Update, context: CallbackContext, info: str,
                 markup = make_keyboard(context, user)
                 view.update(info, parking.state_text, markup)
                 log_event(update, f'Отправили уведомление {users[user]}')
-            except BadRequest:
+            except (BadRequest, KeyError):
                 # So user needs new messages for updating
                 bad_request(user, info)
 
