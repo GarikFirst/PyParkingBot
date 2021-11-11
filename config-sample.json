@@ -1,13 +1,17 @@
 {
+    "data_file_prefix": "pickle",
+    "logging": {
+        "log_file": "log.txt",
+        "log_length": "10"
+    },
     "owner_id": 12345,
     "places": [
         "1",
         "2",
         "3",
-        "4",
-        "5"
+        "4"
     ],
-    "token": "YOUR TOKEN HERE",
+    "token": "YOUR TOKEN",
     "users_file": "users.json",
     "whitelist": false
 }
