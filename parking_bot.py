@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from json import dump, load
 from logging import INFO, basicConfig, getLogger
+from subprocess import run
 
 from emoji import emojize
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -31,7 +32,6 @@ def stop(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         try:
-            # FIXME
             log_event(update, 'Отправил stop')
             view = context.bot_data['views'][str(update.effective_user.id)]
             view.delete()
@@ -192,15 +192,21 @@ def manage_user(update: Update, context: CallbackContext, check=True) -> None:
         if user_id not in users or users[user_id] != username:
             users[user_id] = username
         save_json(config['users_file'], users)
+        log_event(update, 'Добавили пользователя')
     elif not check and user_id in users:
         context.bot_data['views'].pop(user_id, None)
         users.pop(user_id, None)
         save_json(config['users_file'], users)
+        log_event(update, 'Удалили пользователя')
 
 
 def log_event(update: Update, action: str) -> None:
+    try:
+        username = f'{users[str(update.effective_user.id)]}'
+    except KeyError:
+        username = 'PyParkingBot'
     action = action.replace('*', '')
-    logger.log(INFO, f'{users[str(update.effective_user.id)]} - {action}')
+    logger.log(INFO, f'{username} - {action}')
 
 
 def load_json(filename) -> object:
@@ -227,11 +233,43 @@ def get_config() -> dict:
     return config
 
 
+def toggle_whitelist(update: Update, context: CallbackContext) -> None:
+    if update.effective_user.id == config['owner_id']:
+        config['whitelist'] = not config['whitelist']
+        update.effective_message.reply_text('Whitelist mode: ' +
+                                            f'{config["whitelist"]}')
+        log_event(update, 'Переключил режим whitelist на ' +
+                  f'{config["whitelist"]}')
+    else:
+        log_event(update, 'Отправил whitelist, хотя не должен о ней знать')
+
+
+def get_logs(update: Update, context: CallbackContext) -> None:
+    if update.effective_user.id == config['owner_id']:
+        if not context.args:
+            length = config['logging']['log_length']
+            log_event(update, 'Отправил logs без ключей')
+        else:
+            length = context.args[0]
+            log_event(update, f'Отправил logs с ключем {length}')
+        result = run(['tail', '-n', length, config['logging']['log_file']],
+                     capture_output=True, universal_newlines=True)
+        log = result.stdout
+        if len(log) > 4096:
+            for x in range(0, len(log), 4096):
+                update.effective_message.reply_text(log[x:x+4096])
+        else:
+            update.effective_message.reply_text(log)
+    else:
+        log_event(update, 'Отправил logs, хотя не должен о ней знать')
+
+
 config = get_config()
 users = load_json(config['users_file'])
 
 log_format = '%(asctime)s %(levelname)s %(name)s %(message)s'
-basicConfig(filename=config['log_file'], format=log_format, level=INFO)
+basicConfig(filename=config['logging']['log_file'],
+            format=log_format, level=INFO)
 logger = getLogger(__name__)
 
 handlers = [CommandHandler('start', start),
@@ -239,18 +277,22 @@ handlers = [CommandHandler('start', start),
             CallbackQueryHandler(cancel_handler, pattern='cancel.*'),
             CallbackQueryHandler(clear_handler, pattern='clear'),
             CallbackQueryHandler(statistics_handler, pattern='statistics'),
-            CallbackQueryHandler(parking_handler)]
+            CallbackQueryHandler(parking_handler),
+            CommandHandler('whitelist', toggle_whitelist),
+            CommandHandler('logs', get_logs, pass_args=True)]
 
 
 def main():
     updater = Updater(token=config['token'], persistence=PicklePersistence(
-        filename=config['data_file'], store_chat_data=False, on_flush=False))
+        filename=config['data_file_prefix'], store_chat_data=False,
+        single_file=False, on_flush=False))
     dispatcher = updater.dispatcher
     dispatcher.bot_data['stats'] = dispatcher.bot_data.get('stats',
                                                            Stats(users))
     dispatcher.bot_data['views'] = dispatcher.bot_data.get('views', {})
     dispatcher.bot_data['parking'] = dispatcher.bot_data.get(
         'parking', Parking(config['places']))
+    # Create new parking if places in config changed
     if ([x[2] for x in dispatcher.bot_data['parking'].state]
        != config['places']):
         dispatcher.bot_data['parking'] = Parking(config['places'])
