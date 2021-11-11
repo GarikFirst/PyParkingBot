@@ -42,9 +42,12 @@ class ParkingPlace:
         else:
             raise ValueError
 
-    def cancel_reserve(self) -> None:
-        self.__state = 'free'
-        self.__occupant = None
+    def cancel_reserve(self, user) -> None:
+        if self.__occupant == user and self.state == 'reserved':
+            self.__state = 'free'
+            self.__occupant = None
+        else:
+            raise ValueError
 
     def clear(self) -> None:
         self.__state = 'free'
@@ -79,6 +82,8 @@ class Parking():
                 if place.state != 'free':
                     places.append(deepcopy(place))
                     place.clear()
+        else:
+            raise ValueError
         return places
 
     def __populate_parking(self, numbers: list) -> list:

@@ -35,6 +35,9 @@ def stop(update: Update, context: CallbackContext) -> None:
             log_event(update, 'Отправил stop')
             view = context.bot_data['views'][str(update.effective_user.id)]
             view.delete()
+            update.effective_message.reply_text(
+                'Вы перестали получать уведомления. Вы можете в любой момент' +
+                ' вернутся к их получению командой /start.')
             manage_user(update, context, False)
         except KeyError:
             log_event(update, 'Отправил stop повторно')
@@ -46,8 +49,8 @@ def parking_handler(update: Update, context: CallbackContext) -> None:
         manage_user(update, context)
         context.user_data['is_in_menu'] = False
         number = update.callback_query.data
-        parking = context.bot_data['parking']
         try:
+            parking = context.bot_data['parking']
             stats = context.bot_data['stats']
             for place in parking.places:
                 if place.number == number:
@@ -77,14 +80,19 @@ def cancel_handler(update: Update, context: CallbackContext) -> None:
         context.user_data['is_in_menu'] = False
         number = update.callback_query.data.split('.')[1]
         parking = context.bot_data['parking']
-        for place in parking.places:
-            if place.number == number:
-                place.cancel_reserve()
-        update.callback_query.answer(f'Вы отменили резерв места {number}')
-        action = (f'*{users[str(update.effective_user.id)]}* ' +
-                  f'отменил резерв места *{number}*')
-        update_state(update, context, action)
-        log_event(update, action)
+        try:
+            for place in parking.places:
+                if place.number == number:
+                    place.cancel_reserve(str(update.effective_user.id))
+            update.callback_query.answer(f'Вы отменили резерв места {number}')
+            action = (f'*{users[str(update.effective_user.id)]}* ' +
+                      f'отменил резерв места *{number}*')
+            update_state(update, context, action)
+            log_event(update, action)
+        except ValueError:
+            update.callback_query.answer(
+                'Используйте клавиатуру из последнего сообщения!')
+            log_event(update, 'Пытался отменить резерв на старой клавиатуре')
 
 
 def clear_handler(update: Update, context: CallbackContext) -> None:
@@ -92,17 +100,22 @@ def clear_handler(update: Update, context: CallbackContext) -> None:
        or not config['whitelist']):
         manage_user(update, context)
         context.user_data['is_in_menu'] = False
-        update.callback_query.answer('Вы выбрали очистку парковки')
-        parking = context.bot_data['parking']
-        places = parking.clear()
-        if places:
-            stats = context.bot_data['stats']
-            for place in places:
-                stats.count(place)
-        action = (f'*{users[str(update.effective_user.id)]}* ' +
-                  'очистил парковочное пространство')
-        update_state(update, context, action)
-        log_event(update, action)
+        try:
+            parking = context.bot_data['parking']
+            places = parking.clear()
+            if places:
+                stats = context.bot_data['stats']
+                for place in places:
+                    stats.count(place)
+            update.callback_query.answer('Вы выбрали очистку парковки')
+            action = (f'*{users[str(update.effective_user.id)]}* ' +
+                      'очистил парковочное пространство')
+            update_state(update, context, action)
+            log_event(update, action)
+        except ValueError:
+            update.callback_query.answer(
+                'Используйте клавиатуру из последнего сообщения!')
+            log_event(update, 'Пытался очистить парковку на старой клавиатуре')
 
 
 def statistics_handler(update: Update, context: CallbackContext) -> None:
@@ -227,7 +240,7 @@ def log_event(update: Update, action: str) -> None:
     try:
         username = f'{users[str(update.effective_user.id)]}'
     except KeyError:
-        username = 'PyParkingBot'
+        username = update.effective_user.username
     action = action.replace('*', '')
     logger.log(INFO, f'{username} - {action}')
 
@@ -271,7 +284,7 @@ def get_logs(update: Update, context: CallbackContext) -> None:
     if update.effective_user.id == config['owner_id']:
         if not context.args:
             length = config['logging']['log_length']
-            log_event(update, 'Отправил logs без ключей')
+            log_event(update, f'Отправил logs без ключей, берем {length}')
         else:
             length = context.args[0]
             log_event(update, f'Отправил logs с ключем {length}')
