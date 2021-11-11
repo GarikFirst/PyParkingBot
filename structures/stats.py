@@ -66,32 +66,32 @@ class Stats:
                 self.__users[user] = users[user]
 
     def __make(self) -> tuple:
-        return (self.__total_time, self.__rank(self.__places),
-                self.__rank(self.__persons), self.__rank(self.__weekdays),
-                self.__rank(self.__monthes))
+        return (self.__rank(self.__places), self.__rank(self.__persons),
+                self.__rank(self.__weekdays), self.__rank(self.__monthes))
 
     def __rank(self, slice: dict) -> list:
         return sorted(slice.items(), key=lambda tup: tup[1], reverse=True)
 
     def __make_message_text(self) -> str:
-        total_time, places, persons, weekdays, monthes = self.__make()
-        total_time = ':'.join(str(timedelta(0, total_time)).split(':')[:2])
+        places, persons, weekdays, monthes = self.__make()
+        total_count = sum(self.__places.values())
+        total_time = ':'.join(
+            str(timedelta(0, self.__total_time)).split(':')[:2])
         places = self.__make_message_text_block(places)
         persons = self.__make_message_text_block(persons, self.__users)
         weekdays = self.__make_message_text_block(weekdays)
         monthes = self.__make_message_text_block(monthes)
-        return '\n\n'.join([
-                         ' '.join([emojize(':bar_chart:'), f'**Статистика**']),
-                         ' '.join([emojize(':stopwatch:'),
-                                  f'**Суммарное время**: {total_time}']),
-                         ' '.join([emojize(':P_button:'),
-                                  f'**Места**{places}']),
-                         ' '.join([emojize(':bust_in_silhouette:'),
-                                  f'**Люди**{persons}']),
-                         ' '.join([emojize(':tear-off_calendar:'),
-                                  f'**Дни недели**{weekdays}']),
-                         ' '.join([emojize(':spiral_calendar:'),
-                                  f'**Месяцы**{monthes}'])])
+        return '\n\n'.join(
+            [' '.join([emojize(':bar_chart:'), f'*Статистика*']),
+             ' '.join([emojize(':abacus:'),
+                      fr'*Суммарное кол\-во*: {total_count}']) + '\n' +
+             ' '.join([emojize(':stopwatch:'),
+                      f'*Суммарное время*: {total_time}']),
+             ' '.join([emojize(':P_button:'), f'*Места*{places}']),
+             ' '.join([emojize(':bust_in_silhouette:'), f'*Люди*{persons}']),
+             ' '.join([emojize(':tear-off_calendar:'),
+                      f'*Дни недели*{weekdays}']),
+             ' '.join([emojize(':spiral_calendar:'), f'*Месяцы*{monthes}'])])
 
     def __make_message_text_block(self, block: list, users=None) -> str:
         text = ''
