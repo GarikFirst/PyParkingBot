@@ -15,20 +15,26 @@ from structures.user_view import UserView as UserView
 
 
 def start(update: Update, context: CallbackContext) -> None:
+    """Send first messages to user."""
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
         parking = context.bot_data['parking']
         markup = make_keyboard(context, str(update.effective_user.id))
-        info = update.effective_message.reply_text('---')
+        welcome = (r'Вас приветствует *Парковочный бот Logrocon*\!' +
+                   '\nВыберете место кнопками ниже')
+        info = update.effective_message.reply_text(welcome,
+                                                   parse_mode='MarkdownV2')
         status = update.effective_message.reply_text(
             parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
+        # Creation of view, futher we will be only updating it
         view = UserView(info, status)
         context.bot_data['views'][str(update.effective_user.id)] = view
         log_event(update, 'Отправил start')
 
 
 def stop(update: Update, context: CallbackContext) -> None:
+    """Say goodbye, delete messages user data."""
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         try:
@@ -44,6 +50,7 @@ def stop(update: Update, context: CallbackContext) -> None:
 
 
 def parking_handler(update: Update, context: CallbackContext) -> None:
+    """Handler for place selection buttons."""
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
@@ -58,7 +65,7 @@ def parking_handler(update: Update, context: CallbackContext) -> None:
                     place.toggle_state(str(update.effective_user.id))
                     state = place.state
             if state == 'reserved':
-                action_text = 'зарервировал'
+                action_text = 'зарезервировал'
             elif state == 'occupied':
                 action_text = 'занял'
             elif state == 'free':
@@ -74,6 +81,7 @@ def parking_handler(update: Update, context: CallbackContext) -> None:
 
 
 def cancel_handler(update: Update, context: CallbackContext) -> None:
+    """Handler for cancel reserve button."""
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
@@ -96,6 +104,7 @@ def cancel_handler(update: Update, context: CallbackContext) -> None:
 
 
 def clear_handler(update: Update, context: CallbackContext) -> None:
+    """Handler for clear parking button."""
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
@@ -119,6 +128,7 @@ def clear_handler(update: Update, context: CallbackContext) -> None:
 
 
 def statistics_handler(update: Update, context: CallbackContext) -> None:
+    """Handler for statistic menu button."""
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
@@ -139,9 +149,23 @@ def statistics_handler(update: Update, context: CallbackContext) -> None:
 
 def update_state(update: Update, context: CallbackContext, info: str,
                  personal=False) -> None:
-    """ Personal or bulk messages update """
-    def bad_request(user, text=None) -> None:
-        """ Resend messages if user messed them up """
+    """Sends personal or bulk messages by updating.
+
+    Args:
+        update: for identifying users and getting bot for bulk send.
+        context: for getting bot and user data.
+        info: info string for info message.
+        personal (optional): should this message be personal only.
+        Defaults to False.
+    """
+    def bad_request(user: str, text=None) -> None:
+        """Send new messages if user removes old ones.
+
+        Args:
+            user: user_id.
+            text (optional): for sending bulk update with some text.
+            Defaults to None.
+        """
         log_event(update, f'{users[user]} что-то сделал с сообщениями бота')
         markup = make_keyboard(context, user)
         if text is not None:
@@ -162,6 +186,7 @@ def update_state(update: Update, context: CallbackContext, info: str,
             view = context.bot_data['views'][str(update.effective_user.id)]
             view.update(info, None)
         except BadRequest:
+            # So user needs new messages for updating
             bad_request(str(update.effective_user.id))
     else:
         for user in users:
@@ -171,11 +196,13 @@ def update_state(update: Update, context: CallbackContext, info: str,
                 view.update(info, parking.state_text, markup)
                 log_event(update, f'Отправили уведомление {users[user]}')
             except BadRequest:
+                # So user needs new messages for updating
                 bad_request(user, info)
 
 
 def make_keyboard(context: CallbackContext,
                   user_id: str) -> InlineKeyboardMarkup:
+    """Making of personalized keyboards."""
     keyboard = []
     parking = context.bot_data['parking']
     for place in parking.state:
@@ -213,6 +240,12 @@ def make_keyboard(context: CallbackContext,
 
 
 def manage_user(update: Update, context: CallbackContext, check=True) -> None:
+    """Managing users.
+
+    Args:
+        check (optional): if not check - than it's user remove.
+        Defaults to True.
+    """
     user_id = str(update.effective_user.id)
     if check:
         if update.effective_user.full_name is None:
@@ -245,7 +278,7 @@ def log_event(update: Update, action: str) -> None:
     logger.log(INFO, f'{username} - {action}')
 
 
-def load_json(filename) -> object:
+def load_json(filename: str) -> dict:
     try:
         with open(filename) as file:
             data = load(file)
@@ -254,7 +287,7 @@ def load_json(filename) -> object:
         exit(f'File "{filename}" does not exist')
 
 
-def save_json(filename, data) -> None:
+def save_json(filename: str, data: dict) -> None:
     with open(filename, 'w') as file:
         dump(data, file, indent=4, sort_keys=True)
 
@@ -270,6 +303,7 @@ def get_config() -> dict:
 
 
 def toggle_whitelist(update: Update, context: CallbackContext) -> None:
+    """Toggling bot's whitelist on and off by bot owner."""
     if update.effective_user.id == config['owner_id']:
         config['whitelist'] = not config['whitelist']
         update.effective_message.reply_text('Whitelist mode: ' +
@@ -281,13 +315,14 @@ def toggle_whitelist(update: Update, context: CallbackContext) -> None:
 
 
 def get_logs(update: Update, context: CallbackContext) -> None:
+    """Getting logs by messages from bot by bot owner."""
     if update.effective_user.id == config['owner_id']:
         if not context.args:
             length = config['logging']['log_length']
             log_event(update, f'Отправил logs без ключей, берем {length}')
         else:
             length = context.args[0]
-            log_event(update, f'Отправил logs с ключем {length}')
+            log_event(update, f'Отправил logs с ключом {length}')
         result = run(['tail', '-n', length, config['logging']['log_file']],
                      capture_output=True, universal_newlines=True)
         log = result.stdout
@@ -301,8 +336,12 @@ def get_logs(update: Update, context: CallbackContext) -> None:
 
 
 config = get_config()
-users = load_json(config['users_file'])
+"""dict: all config options."""
 
+users = load_json(config['users_file'])
+"""dict: bot users."""
+
+# Set logging
 log_format = '%(asctime)s %(levelname)s %(name)s %(message)s'
 basicConfig(filename=config['logging']['log_file'],
             format=log_format, level=INFO)

@@ -5,29 +5,52 @@ from emoji import emojize
 
 
 class ParkingPlace:
-    def __init__(self, number) -> None:
+    """Representation of parking place.
+
+    Attributes:
+        number: place number.
+
+    Logic is really simple - each place has three states:
+    - free
+    - reserved
+    - occupied
+
+    and can toggle between them (free -> reserved -> occupied -> free).
+    Since place reserved or occupied no other user can take this place.
+    Also user can cancel reserve.
+    """
+    def __init__(self, number: str) -> None:
         self.__number = number
         self.__state = 'free'
         self.__occupant = None
         self.__occupy_since = None
 
     @property
-    def number(self):
+    def number(self) -> str:
         return self.__number
 
     @property
-    def state(self):
+    def state(self) -> str:
         return self.__state
 
     @property
-    def occupant(self):
+    def occupant(self) -> str:
         return self.__occupant
 
     @property
-    def occupy_since(self):
+    def occupy_since(self) -> datetime:
         return self.__occupy_since
 
     def toggle_state(self, user_id: str) -> None:
+        """Toggles place state.
+
+        Args:
+            user_id: user_id for for check possibility of state change.
+
+        Raises:
+            ValueError: if user wants place that not free and
+            don't belong to him.
+        """
         if self.__state == 'free':
             self.__state = 'reserved'
             self.__occupant = user_id
@@ -42,7 +65,16 @@ class ParkingPlace:
         else:
             raise ValueError
 
-    def cancel_reserve(self, user) -> None:
+    def cancel_reserve(self, user: str) -> None:
+        """Cancel the reserve and change place state to free.
+
+        Args:
+            user: user_id for check possibility of canceling the reserve.
+
+        Raises:
+            ValueError: if place don't belong to user (it means that
+            user press button on old keyboard).
+        """
         if self.__occupant == user and self.state == 'reserved':
             self.__state = 'free'
             self.__occupant = None
@@ -50,32 +82,54 @@ class ParkingPlace:
             raise ValueError
 
     def clear(self) -> None:
+        """For "clearing" the place without rights check."""
         self.__state = 'free'
         self.__occupant = None
         self.__occupy_since = None
 
 
 class Parking():
+    """Representation of the parking lot.
+
+    Can be cleared (all places set to free without rights check).
+    """
     def __init__(self, numbers: list) -> None:
         self.__places = self.__populate_parking(numbers)
 
     @property
-    def places(self):
+    def places(self) -> list:
         return self.__places
 
     @property
-    def state(self):
+    def state(self) -> list:
+        """For keyboard making.
+
+        Returns:
+            list: list of tuples for place representation while
+            making keyboard.
+        """
         return self.__make_state()
 
     @property
-    def state_text(self):
+    def state_text(self) -> str:
+        """Text state for "status" message"""
         return self.__make_state_text()
 
     @property
-    def is_free(self):
+    def is_free(self) -> bool:
+        """Is parking free."""
         return self.__check_free()
 
     def clear(self) -> list:
+        """Free all places of parking.
+
+        Raises:
+            ValueError: if there is no not free places (it means that
+            user press button on old keyboard).
+
+        Returns:
+            list: copy of places that have been cleared for statistics count.
+        """
         places = []
         if not self.is_free:
             for place in self.__places:

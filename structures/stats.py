@@ -7,6 +7,10 @@ from .parking import ParkingPlace
 
 
 class Stats:
+    """Statistics class for storing and counting.
+
+    Have multiple dimensions, like weekdays, persons, etc...
+    """
     def __init__(self, users: dict) -> None:
         self.__users = deepcopy(users)
         self.__places = {}
@@ -20,6 +24,15 @@ class Stats:
         return self.__make_message_text()
 
     def count(self, place: ParkingPlace) -> None:
+        """Count place in statistics.
+
+        For reserved places it means that place have been just occupied.
+        For occupied - just freed.
+
+        Args:
+            place (ParkingPlace): place that needs to be counted.
+            Should be BEFORE state change.
+        """
         today = date.today()
         if place.state == 'reserved':
             self.__places[place.number] = self.__places.get(
@@ -34,7 +47,16 @@ class Stats:
             self.__total_time = self.__total_time + (
                 datetime.today() - place.occupy_since).total_seconds()
 
-    def update_users(self, users) -> None:
+    def update_users(self, users: dict) -> None:
+        """For adding users while bot is already running.
+
+        We only add users, otherwise we get key error
+        when try to get username for user when handling request for
+        statistics message.
+
+        Args:
+            users: new users.
+        """
         new_users = set(users) - set(self.__users)
         if new_users != set():
             for user in new_users:
@@ -73,6 +95,7 @@ class Stats:
         for num, entry in enumerate(block, start=1):
             item, value = entry
             if users is not None:
+                # We need names, not id's
                 item = self.__users[item]
             text = '\n'.join([text, ' '.join([str(num) +
                              r'\.', str(item), r'\- ' + str(value)])])
