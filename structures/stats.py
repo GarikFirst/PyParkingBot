@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import date, datetime, timedelta
 
 from emoji import emojize
@@ -7,7 +8,7 @@ from .parking import ParkingPlace
 
 class Stats:
     def __init__(self, users: dict) -> None:
-        self.__users = users
+        self.__users = deepcopy(users)
         self.__places = {}
         self.__persons = {}
         self.__weekdays = {}
@@ -32,6 +33,12 @@ class Stats:
         elif place.state == 'occupied':
             self.__total_time = self.__total_time + (
                 datetime.today() - place.occupy_since).total_seconds()
+
+    def update_users(self, users) -> None:
+        new_users = set(users) - set(self.__users)
+        if new_users != set():
+            for user in new_users:
+                self.__users[user] = users[user]
 
     def __make(self) -> tuple:
         return (self.__total_time, self.__rank(self.__places),
