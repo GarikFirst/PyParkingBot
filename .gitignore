@@ -3,3 +3,4 @@ __pycache__
 config.json
 pickle*
 log.txt
+stats_old.json
