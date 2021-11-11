@@ -104,7 +104,7 @@ class Parking():
         return state
 
     def __make_state_text(self) -> str:
-        sort_order = {"occupied": 0, "reserved": 1, "free": 2}
+        sort_order = {'occupied': 0, 'reserved': 1, 'free': 2}
         places = sorted(self.__places, key=lambda x: sort_order[x.state])
         state_text = ''
         for place in places:
