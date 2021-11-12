@@ -54,16 +54,19 @@ class Stats:
     def update_users(self, users: dict) -> None:
         """For adding users while bot is already running.
 
-        We only add users, otherwise we get key error
-        when try to get username for user when handling request for
-        statistics message.
+        We only add users, removed ones stays for history.
 
         Args:
             users: new users.
         """
+        # Adding new users
         new_users = set(users) - set(self.__users)
         if new_users != set():
             for user in new_users:
+                self.__users[user] = users[user]
+        # If user changes name - we should rename him too
+        for user in users:
+            if self.__users[user] != users[user]:
                 self.__users[user] = users[user]
 
     def __make(self) -> tuple:
