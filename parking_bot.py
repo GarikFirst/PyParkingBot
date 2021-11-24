@@ -11,7 +11,6 @@ from telegram.ext import (CallbackContext, CallbackQueryHandler,
 
 from structures.parking import Parking as Parking
 from structures.stats import Stats as Stats
-from structures.user_view import UserView as UserView
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -23,13 +22,9 @@ def start(update: Update, context: CallbackContext) -> None:
         markup = make_keyboard(context, str(update.effective_user.id))
         welcome = (r'Вас приветствует *Парковочный бот Logrocon*\!' +
                    '\nВыберете место кнопками ниже')
-        info = update.effective_message.reply_text(welcome,
-                                                   parse_mode='MarkdownV2')
-        status = update.effective_message.reply_text(
+        update.effective_message.reply_text(welcome, parse_mode='MarkdownV2')
+        update.effective_message.reply_text(
             parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
-        # Creation of view, futher we will be only updating it
-        view = UserView(info, status)
-        context.bot_data['views'][str(update.effective_user.id)] = view
         log_event(update, 'Отправил start')
 
 
@@ -39,8 +34,6 @@ def stop(update: Update, context: CallbackContext) -> None:
        or not config['whitelist']):
         try:
             log_event(update, 'Отправил stop')
-            view = context.bot_data['views'][str(update.effective_user.id)]
-            view.delete()
             update.effective_message.reply_text(
                 'Вы перестали получать уведомления. Вы можете в любой момент' +
                 ' вернутся к их получению командой /start.')
@@ -132,19 +125,10 @@ def statistics_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
-        context.user_data['is_in_menu'] = context.user_data.get('is_in_menu',
-                                                                False)
-        if not context.user_data['is_in_menu']:
-            update.callback_query.answer('Вы открыли статистику')
-            context.user_data['is_in_menu'] = True
-            stats = context.bot_data['stats']
-            update_state(update, context, stats.message_text, True)
-            log_event(update, 'Открыл статистику')
-        else:
-            update.callback_query.answer('Вы закрыли статистику')
-            context.user_data['is_in_menu'] = False
-            update_state(update, context, r'\-\-\-', True)
-            log_event(update, 'Закрыл статистику')
+        update.callback_query.answer('Вы запросили статистику')
+        stats = context.bot_data['stats']
+        update_state(update, context, stats.message_text, True)
+        log_event(update, 'Запросил статистику')
 
 
 def update_state(update: Update, context: CallbackContext, info: str,
@@ -158,46 +142,21 @@ def update_state(update: Update, context: CallbackContext, info: str,
         personal (optional): should this message be personal only.
         Defaults to False.
     """
-    def bad_request(user: str, text=None) -> None:
-        """Send new messages if user removes old ones.
-
-        Args:
-            user: user_id.
-            text (optional): for sending bulk update with some text.
-            Defaults to None.
-        """
-        log_event(update, f'{users[user]} что-то сделал с сообщениями бота')
-        markup = make_keyboard(context, user)
-        if text is not None:
-            info = update.effective_message.bot.send_message(
-                user, text, parse_mode='MarkdownV2')
-        else:
-            info = update.effective_message.bot.send_message(user, '---')
-        status = update.effective_message.bot.send_message(
-            user, parking.state_text, reply_markup=markup,
-            parse_mode='MarkdownV2')
-        view = UserView(info, status)
-        context.bot_data['views'][user] = view
-        log_event(update, f'Отправили уведомление {users[user]}')
-
     parking = context.bot_data['parking']
     if personal:
-        try:
-            view = context.bot_data['views'][str(update.effective_user.id)]
-            view.update(info, None)
-        except (BadRequest, KeyError):
-            # So user needs new messages for updating
-            bad_request(str(update.effective_user.id))
+        markup = make_keyboard(context, str(update.effective_user.id))
+        update.effective_message.reply_text(
+            text=info, parse_mode='MarkdownV2')
+        update.effective_message.reply_text(
+            text=parking.state_text, reply_markup=markup)
     else:
         for user in users:
-            try:
-                view = context.bot_data['views'][user]
-                markup = make_keyboard(context, user)
-                view.update(info, parking.state_text, markup)
-                log_event(update, f'Отправили уведомление {users[user]}')
-            except (BadRequest, KeyError):
-                # So user needs new messages for updating
-                bad_request(user, info)
+            markup = make_keyboard(context, user)
+            update.effective_message.bot.send_message(
+                text=info, chat_id=user, parse_mode='MarkdownV2')
+            update.effective_message.bot.send_message(
+                text=parking.state_text, chat_id=user, reply_markup=markup)
+            log_event(update, f'Отправили уведомление {users[user]}')
 
 
 def make_keyboard(context: CallbackContext,
@@ -263,7 +222,6 @@ def manage_user(update: Update, context: CallbackContext, check=True) -> None:
             stats.update_users(users)
             log_event(update, 'Добавили пользователя')
     elif not check and user_id in users:
-        context.bot_data['views'].pop(user_id, None)
         users.pop(user_id, None)
         save_json(config['users_file'], users)
         log_event(update, 'Удалили пользователя')
@@ -364,7 +322,6 @@ def main():
     dispatcher = updater.dispatcher
     dispatcher.bot_data['stats'] = dispatcher.bot_data.get('stats',
                                                            Stats(users))
-    dispatcher.bot_data['views'] = dispatcher.bot_data.get('views', {})
     dispatcher.bot_data['parking'] = dispatcher.bot_data.get(
         'parking', Parking(config['places']))
     # Create new parking if places in config changed
