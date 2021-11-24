@@ -3,5 +3,5 @@
 __pycache__
 config.json
 log.txt
-pickle*
+*.pickle
 stats_old.json
