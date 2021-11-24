@@ -2,8 +2,6 @@
 
 Simple telegram bot on python3 for parking booking and some statistics about parking use.
 
-This bot don't send unnecessary messages and just edits originally send, so no annoying phone ringing will take place.
-
 This bot uses the [python telegram bot](https://python-telegram-bot.org) framework to make Telegram API calls.
 
 All messages are in russian, but you can adapt it with no effort, there about 10 of them.

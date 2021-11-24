@@ -1,5 +1,5 @@
 {
-    "data_file_prefix": "pickle",
+    "data_file": "data.pickle",
     "logging": {
         "log_file": "log.txt",
         "log_length": "10"
