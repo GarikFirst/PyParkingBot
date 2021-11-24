@@ -28,7 +28,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
 
 def stop(update: Update, context: CallbackContext) -> None:
-    """Say goodbye, delete messages user data."""
+    """Say goodbye, delete user data."""
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         try:
@@ -216,8 +216,8 @@ def manage_user(update: Update, context: CallbackContext, check=True) -> None:
             stats = context.bot_data['stats']
             stats.update_users(users)
             log_event(update, 'Добавили пользователя')
-    elif not check and user_id in users:
-        users.pop(user_id, None)
+    elif not check:
+        users.pop(user_id)
         save_json(config['users_file'], users)
         log_event(update, 'Удалили пользователя')
 
