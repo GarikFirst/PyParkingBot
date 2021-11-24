@@ -5,7 +5,6 @@ from subprocess import run
 
 from emoji import emojize
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.error import BadRequest
 from telegram.ext import (CallbackContext, CallbackQueryHandler,
                           CommandHandler, PicklePersistence, Updater)
 
@@ -24,7 +23,7 @@ def start(update: Update, context: CallbackContext) -> None:
                    '\nВыберете место кнопками ниже')
         update.effective_message.reply_text(welcome, parse_mode='MarkdownV2')
         update.effective_message.reply_text(
-            parking.state_text, reply_markup=markup, parse_mode='MarkdownV2')
+            parking.state_text, reply_markup=markup)
         log_event(update, 'Отправил start')
 
 
@@ -47,7 +46,6 @@ def parking_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
-        context.user_data['is_in_menu'] = False
         number = update.callback_query.data
         try:
             parking = context.bot_data['parking']
@@ -78,7 +76,6 @@ def cancel_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
-        context.user_data['is_in_menu'] = False
         number = update.callback_query.data.split('.')[1]
         parking = context.bot_data['parking']
         try:
@@ -101,7 +98,6 @@ def clear_handler(update: Update, context: CallbackContext) -> None:
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
-        context.user_data['is_in_menu'] = False
         try:
             parking = context.bot_data['parking']
             places = parking.clear()
@@ -121,7 +117,7 @@ def clear_handler(update: Update, context: CallbackContext) -> None:
 
 
 def statistics_handler(update: Update, context: CallbackContext) -> None:
-    """Handler for statistic menu button."""
+    """Handler for statistic button."""
     if (config['whitelist'] and str(update.effective_user.id) in users
        or not config['whitelist']):
         manage_user(update, context)
@@ -133,7 +129,7 @@ def statistics_handler(update: Update, context: CallbackContext) -> None:
 
 def update_state(update: Update, context: CallbackContext, info: str,
                  personal=False) -> None:
-    """Sends personal or bulk messages by updating.
+    """Sends personal or bulk messages to users.
 
     Args:
         update: for identifying users and getting bot for bulk send.
@@ -145,10 +141,9 @@ def update_state(update: Update, context: CallbackContext, info: str,
     parking = context.bot_data['parking']
     if personal:
         markup = make_keyboard(context, str(update.effective_user.id))
-        update.effective_message.reply_text(
-            text=info, parse_mode='MarkdownV2')
-        update.effective_message.reply_text(
-            text=parking.state_text, reply_markup=markup)
+        update.effective_message.reply_text(info, parse_mode='MarkdownV2')
+        update.effective_message.reply_text(parking.state_text,
+                                            reply_markup=markup)
     else:
         for user in users:
             markup = make_keyboard(context, user)
@@ -317,8 +312,8 @@ handlers = [CommandHandler('start', start),
 
 def main():
     updater = Updater(token=config['token'], persistence=PicklePersistence(
-        filename=config['data_file_prefix'], store_chat_data=False,
-        single_file=False, on_flush=False))
+        filename=config['data_file'], store_chat_data=False,
+        store_user_data=False, on_flush=False))
     dispatcher = updater.dispatcher
     dispatcher.bot_data['stats'] = dispatcher.bot_data.get('stats',
                                                            Stats(users))
