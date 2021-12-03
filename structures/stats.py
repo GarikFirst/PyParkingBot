@@ -27,6 +27,28 @@ class Stats:
         """Contains statistics text for messages"""
         return self.__make_message_text()
 
+    @property
+    def as_dict(self) -> dict:
+        """For getting statistics as dict"""
+        stats = {}
+        stats['users'] = self.__users
+        stats['places'] = self.__places
+        stats['persons'] = self.__persons
+        stats['weekdays'] = self.__weekdays
+        stats['monthes'] = self.__monthes
+        stats['total_time'] = self.__total_time
+        return stats
+
+    @as_dict.setter
+    def as_dict(self, stats) -> None:
+        """For setting statistics from dict"""
+        self.__users = stats['users']
+        self.__places = stats['places']
+        self.__persons = stats['persons']
+        self.__weekdays = stats['weekdays']
+        self.__monthes = stats['monthes']
+        self.__total_time = stats['total_time']
+
     def count(self, place: ParkingPlace) -> None:
         """Count place in statistics.
 
