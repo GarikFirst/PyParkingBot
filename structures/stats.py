@@ -64,7 +64,7 @@ class Stats:
         if new_users != set():
             for user in new_users:
                 self.__users[user] = users[user]
-        # If user changes name - we should rename him too
+        # If user changes name - we should change it too
         for user in users:
             if self.__users[user] != users[user]:
                 self.__users[user] = users[user]
