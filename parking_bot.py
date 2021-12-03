@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from json import dump, load
+from json import dump, dumps, load, loads
 from logging import INFO, basicConfig, getLogger
 from subprocess import run
 
@@ -272,10 +272,10 @@ def get_logs(update: Update, context: CallbackContext) -> None:
     if update.effective_user.id == config['owner_id']:
         if not context.args:
             length = config['logging']['log_length']
-            log_event(update, f'Отправил logs без ключей, берем {length}')
+            log_event(update, f'Отправил logs без аргументов, берем {length}')
         else:
             length = context.args[0]
-            log_event(update, f'Отправил logs с ключом {length}')
+            log_event(update, f'Отправил logs с аргументом {length}')
         result = run(['tail', '-n', length, config['logging']['log_file']],
                      capture_output=True, universal_newlines=True)
         log = result.stdout
@@ -286,6 +286,33 @@ def get_logs(update: Update, context: CallbackContext) -> None:
             update.effective_message.reply_text(log)
     else:
         log_event(update, 'Отправил logs, хотя не должен о ней знать')
+
+
+def get_stats(update: Update, context: CallbackContext) -> None:
+    """Getting statistics by message from bot by bot owner."""
+    if update.effective_user.id == config['owner_id']:
+        update.effective_message.reply_text(
+            dumps(context.bot_data['stats'].as_dict, indent=4))
+        log_event(update, 'Экспортировал статистику в json')
+    else:
+        log_event(update, 'Отправил get_stats, хотя не должен о ней знать')
+
+
+def set_stats(update: Update, context: CallbackContext) -> None:
+    """Setting statistics by message from bot owner to bot."""
+    if update.effective_user.id == config['owner_id']:
+        if not context.args:
+            update.effective_message.reply_text('Отсутствуют аргументы')
+            log_event(update, f'Отправил set_stats без аргументов')
+        else:
+            stats = ''
+            for item in context.args:
+                stats = stats + ' ' + item
+            context.bot_data['stats'].as_dict = loads(stats)
+            update.effective_message.reply_text('Статистика импортирована')
+            log_event(update, 'Импортировал статистику из json')
+    else:
+        log_event(update, 'Отправил set_stats, хотя не должен о ней знать')
 
 
 config = get_config()
@@ -307,7 +334,9 @@ handlers = [CommandHandler('start', start),
             CallbackQueryHandler(statistics_handler, pattern='statistics'),
             CallbackQueryHandler(parking_handler),
             CommandHandler('whitelist', toggle_whitelist),
-            CommandHandler('logs', get_logs, pass_args=True)]
+            CommandHandler('logs', get_logs, pass_args=True),
+            CommandHandler('get_stats', get_stats),
+            CommandHandler('set_stats', set_stats, pass_args=True)]
 
 
 def main():
