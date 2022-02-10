@@ -40,8 +40,10 @@ There is some statistics (like top usage of the places, persons, weekdays, etc) 
 
 This bot has several admin commands.
 
-- `/logs n` (n can be omitted) - return n lines from logfile, if n is omitted, than **log_length** from config file number of lines
+- `/logs n` (n can be omitted) - bot will reply with message that contains n lines from logfile, if n is omitted, than **log_length** from config file number of lines
 - `/whitelist` - toggle whitelist mode on and of. If whitelist mode is on, bot will reply to users that already using the bot (users in **users.json**)
+- `get_stats` - bot will reply with message that contains statistics in json format (not with file)
+- `set_stats {json}` - overwrite current statistics with provided json formated message (not a file) as argument
 
 ## Config options
 
