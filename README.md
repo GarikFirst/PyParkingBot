@@ -18,7 +18,7 @@ It's really simple, just do following steps to run from source (you need python3
 
 ### Launch the bot
 
-1. `python3 -c CONFIG-FILE`, default (no keys specified) is **config.json**.
+1. `python3 parking_bot.py -c CONFIG-FILE`, default (no keys specified) is **config.json**.
 2. Your bot is running! You can go and check your bot in Telegram client by sending /start command.
 
 ## Usage
