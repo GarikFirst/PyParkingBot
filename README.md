@@ -59,5 +59,3 @@ This bot has several admin commands.
 | data_file_prefix   | prefix for data files             |
 
 Copyright © 2021 Igor Bulekov
-
-Test
